@@ -14,6 +14,43 @@ const getAllVideos = asyncHandler(async (req, res) => {
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
   // TODO: get video, upload to cloudinary, create video
+  if ([title, description].some((field) => field?.trim() === "")) {
+    throw new ApiError(400, "Title or description is required");
+  }
+
+  //uploading video
+  const videoLocalPath = req.files?.videoFile[0]?.path;
+  if (!videoLocalPath) {
+    throw new ApiError(400, "videopath is required");
+  }
+
+  const videoFile = await uploadOnCloudinary(videoLocalPath);
+
+  if (!videoFile) {
+    throw new ApiError(400, "video is required");
+  }
+
+  const video = await Video.create({
+    title,
+    thumbnail: videoFile?.secure_url,
+    description,
+    videoFile: videoFile?.url,
+    duration: videoFile?.duration,
+    isPublished: true,
+    owner: req.user?._id,
+  });
+
+  const publishedVideo = await Video.findById(video._id).select(
+    "-thumbnail -duration -views"
+  );
+
+  if (!publishedVideo) {
+    throw new ApiError(500, "Something went wrong while publishing a video");
+  }
+
+  return res
+    .status(201)
+    .json(new ApiResponse(200, publishedVideo, "video uploaded successfully"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
