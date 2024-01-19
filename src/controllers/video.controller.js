@@ -1,4 +1,4 @@
-import mongoose, { isValidObjectId } from "mongoose";
+import mongoose from "mongoose";
 import { Video } from "../models/video.model.js";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -9,6 +9,51 @@ import { uploadOnCloudinary } from "../utils/cloudinary.js";
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
   //TODO: get all videos based on query, sort, pagination
+
+  const pipeline = [];
+
+  // Add conditions based on the provided parameters
+  if (query) {
+    pipeline.push({
+      $match: {
+        title: { $regex: new RegExp(query, "i") },
+      },
+    });
+  }
+
+  if (userId) {
+    pipeline.push({
+      $match: {
+        userId: mongoose.Types.ObjectId(userId),
+      },
+    });
+  }
+
+  // Add sorting stage if sortBy is provided
+  if (sortBy) {
+    const sortStage = {
+      $sort: {
+        [sortBy]: sortType === "desc" ? -1 : 1,
+      },
+    };
+    pipeline.push(sortStage);
+  }
+
+  // Add pagination stages
+  const skipStage = { $skip: (page - 1) * limit };
+  const limitStage = { $limit: Number(limit) };
+  pipeline.push(skipStage, limitStage);
+
+  // Perform the aggregation
+  const result = await Video.aggregate(pipeline);
+
+  if (!result) {
+    return new ApiError(400, "Error while aggregating");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, result, "Successfully fetched all videos"));
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
