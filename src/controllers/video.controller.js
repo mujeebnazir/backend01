@@ -56,20 +56,129 @@ const publishAVideo = asyncHandler(async (req, res) => {
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: get video by id
+
+  if (!videoId?.trim()) {
+    throw new ApiError(404, "No Video ID available");
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) {
+    throw new ApiError(404, "No Video found on the given id");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video fetched successfully by its Id"));
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  //TODO: update video details like title, description, thumbnail
+  if (!videoId?.trim()) {
+    throw new ApiError(404, "No Video ID available");
+  }
+  const videoById = await Video.findById(videoId);
+  const ownerId = videoById?.owner?.toString();
+
+  if (!ownerId) {
+    throw new ApiError(404, "owner not found");
+  }
+  if (req.user?._id?.toString() === ownerId) {
+    const { title, description, thumbnail } = req.body;
+    //TODO: update video details like title, description, thumbnail
+
+    if (!(title || description || thumbnail)) {
+      throw new ApiError(404, "Title or description or thumbnail is required");
+    }
+
+    const video = await Video.findByIdAndUpdate(
+      videoId,
+      {
+        $set: {
+          title: title,
+          description: description,
+          thumbnail: thumbnail,
+        },
+      },
+      { new: true }
+    ).select("-views -duration ");
+
+    if (!video) {
+      throw new ApiError(404, "No Video found on the given id");
+    }
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, video, "Video updated successfully"));
+  } else {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "User dosn't have the permissions"));
+  }
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: delete video
+  if (!videoId?.trim()) {
+    throw new ApiError(404, "No Video ID available");
+  }
+  const videoById = await Video.findById(videoId);
+  const ownerId = videoById?.owner?.toString();
+
+  if (!ownerId) {
+    throw new ApiError(404, "Owner not found");
+  }
+  if (req.user?._id?.toString() === ownerId) {
+    await Video.deleteOne({ _id: videoId });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Video deleted successfully"));
+  } else {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "User dosn't have the permissions"));
+  }
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+
+  if (!videoId?.trim()) {
+    throw new ApiError(404, "No Video ID available");
+  }
+
+  const videoById = await Video.findById(videoId);
+  const ownerId = videoById?.owner?.toString();
+
+  if (!ownerId) {
+    throw new ApiError(404, "Owner not found");
+  }
+  if (req.user?._id?.toString() === ownerId) {
+    const statusChanged = await Video.findByIdAndUpdate(
+      videoId,
+      {
+        $set: {
+          isPublished: !videoById.isPublished,
+        },
+      },
+      { new: true }
+    ).select("-views -duration ");
+
+    if (!statusChanged) {
+      throw new ApiError(400, "!status not changed");
+    }
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(200, statusChanged, "Video status toggled successfully")
+      );
+  } else {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, "User dosn't have the permissions"));
+  }
 });
 
 export {
