@@ -22,23 +22,25 @@ const createTweet = asyncHandler(async (req, res) => {
 
   res
     .status(200)
-    .json(new ApiResponse(200, createTweet, "Tweet posted successfully"));
+    .json(new ApiResponse(200, createdTweet, "Tweet posted successfully"));
 });
 
 const getUserTweets = asyncHandler(async (req, res) => {
   // TODO: get user tweets
   const { userId } = req.params;
 
-  if (!userId) {
-    throw new ApiError(404, "User not found");
+  if (!isValidObjectId(userId)) {
+    throw new ApiError(404, "User not found or id is not valid");
   }
-  const tweets = await Tweet.aggregate({
-    $match: {
-      owner: userId,
+  const tweets = await Tweet.aggregate([
+    {
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId),
+      },
     },
-  });
+  ]);
 
-  if (!tweets) {
+  if (tweets.length === 0) {
     throw new ApiError(404, "Tweets not found");
   }
   return res
@@ -50,7 +52,7 @@ const updateTweet = asyncHandler(async (req, res) => {
   //TODO: update tweet
   const { updatedTweet } = req.body;
   const { tweetId } = req.params;
-  if (!updateTweet) {
+  if (!updatedTweet) {
     throw new ApiError(404, "updatedTweet not found");
   }
 
