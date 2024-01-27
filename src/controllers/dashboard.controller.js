@@ -51,6 +51,46 @@ const getChannelStats = asyncHandler(async (req, res) => {
       "No subscribers or Error found while calulating total subscribers"
     );
   }
+  const totalLikes = await Video.aggregate([
+    {
+      $match: {
+        owner: new mongoose.Types.ObjectId(channelId),
+      },
+    },
+    {
+      $lookup: {
+        from: "likes",
+        localField: "_id",
+        foreignField: "video",
+        as: "videoLikes",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalLikes: { $sum: 1 },
+      },
+    },
+  ]);
+
+  if (totalLikes.length == 0) {
+    throw new ApiError(
+      400,
+      "Error while aggregating pipeline for total likes on videos!!"
+    );
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        total_likes: totalLikes[0],
+        total_subscribers: totalSubscribers[0],
+        total_views_and_videos: totalViewsAndVideos,
+      },
+      "The dashboard information is fetched sucessfully!"
+    )
+  );
 });
 
 const getChannelVideos = asyncHandler(async (req, res) => {
